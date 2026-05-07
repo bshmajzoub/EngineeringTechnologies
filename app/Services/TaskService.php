@@ -11,6 +11,7 @@ use App\Models\TaskAssignment;
 use App\Models\User;
 use DomainException;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 
 class TaskService
@@ -23,7 +24,7 @@ class TaskService
     public function listFor(User $user): Collection
     {
         $query = Task::query()
-            ->with(['assignments.user', 'creator'])
+            ->with(['assignments.user', 'creator', 'assignedBy'])
             ->latest('id');
 
         if ($user->role === UserRole::Employee) {
@@ -33,6 +34,43 @@ class TaskService
         }
 
         return $query->get();
+    }
+
+    /**
+     * @param  array{
+     *     q?: string|null,
+     *     status?: string|null,
+     *     employee_id?: int|string|null,
+     *     task_date?: string|null,
+     *     date_from?: string|null,
+     *     date_to?: string|null
+     * }  $filters
+     * @return LengthAwarePaginator<int, Task>
+     */
+    public function listAdmin(array $filters, int $perPage): LengthAwarePaginator
+    {
+        return Task::query()
+            ->with(['assignments.user', 'creator', 'assignedBy'])
+            ->when($filters['q'] ?? null, function ($query, string $search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query->where('title', 'like', "%{$search}%")
+                        ->orWhere('description', 'like', "%{$search}%")
+                        ->orWhereHas('assignments.user', function ($query) use ($search): void {
+                            $query->where('name', 'like', "%{$search}%")
+                                ->orWhere('email', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when($filters['employee_id'] ?? null, function ($query, int|string $employeeId): void {
+                $query->whereHas('assignments', fn ($query) => $query->where('user_id', (int) $employeeId));
+            })
+            ->when($filters['task_date'] ?? null, fn ($query, string $taskDate) => $query->whereDate('task_date', $taskDate))
+            ->when($filters['date_from'] ?? null, fn ($query, string $dateFrom) => $query->whereDate('task_date', '>=', $dateFrom))
+            ->when($filters['date_to'] ?? null, fn ($query, string $dateTo) => $query->whereDate('task_date', '<=', $dateTo))
+            ->latest('id')
+            ->paginate($perPage)
+            ->withQueryString();
     }
 
     /**
@@ -76,7 +114,7 @@ class TaskService
                 ]);
             }
 
-            $task->load(['assignments.user', 'creator']);
+            $task->load(['assignments.user', 'creator', 'assignedBy']);
 
             foreach ($task->assignments as $assignment) {
                 $this->fcmService->sendTaskAssignedNotification($assignment);
@@ -118,7 +156,7 @@ class TaskService
                 }
             }
 
-            $task->refresh()->load(['assignments.user', 'creator']);
+            $task->refresh()->load(['assignments.user', 'creator', 'assignedBy']);
 
             foreach ($task->assignments as $assignment) {
                 $this->fcmService->sendTaskUpdatedNotification($assignment);
@@ -153,7 +191,7 @@ class TaskService
                     'cancelled_at' => $now,
                 ]);
 
-            $task->refresh()->load(['assignments.user', 'creator']);
+            $task->refresh()->load(['assignments.user', 'creator', 'assignedBy']);
 
             foreach ($task->assignments as $assignment) {
                 $this->fcmService->sendTaskCancelledNotification($assignment, $cancelReason);
@@ -180,14 +218,15 @@ class TaskService
 
             $task->assignments()
                 ->where('status', AssignmentStatus::Pending->value)
+                ->whereNotNull('accepted_at')
                 ->update([
                     'status' => AssignmentStatus::Active,
                     'next_reply_due_at' => $now->copy()->addHour(),
                 ]);
 
-            $task->refresh()->load(['assignments.user', 'creator']);
+            $task->refresh()->load(['assignments.user', 'creator', 'assignedBy']);
 
-            foreach ($task->assignments as $assignment) {
+            foreach ($task->assignments->where('status', AssignmentStatus::Active) as $assignment) {
                 $this->fcmService->sendTaskActivatedNotification($assignment);
             }
 
@@ -198,7 +237,7 @@ class TaskService
     public function myCurrentAssignment(User $employee): ?TaskAssignment
     {
         return TaskAssignment::query()
-            ->with(['task', 'user'])
+            ->with(['task.assignedBy', 'user'])
             ->where('user_id', $employee->id)
             ->whereIn('status', [
                 AssignmentStatus::Pending->value,
@@ -206,6 +245,85 @@ class TaskService
             ])
             ->latest('id')
             ->first();
+    }
+
+    public function acceptAssignment(User $employee, TaskAssignment $assignment): TaskAssignment
+    {
+        return DB::transaction(function () use ($employee, $assignment): TaskAssignment {
+            $assignment = TaskAssignment::query()
+                ->with('task.assignedBy')
+                ->whereKey($assignment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($assignment->user_id !== $employee->id) {
+                abort(404, 'Assignment not found.');
+            }
+
+            if (in_array($assignment->status, [
+                AssignmentStatus::Completed,
+                AssignmentStatus::Cancelled,
+                AssignmentStatus::Rejected,
+            ], true)) {
+                throw new DomainException('This assignment cannot be accepted.');
+            }
+
+            $now = now();
+            $updates = [
+                'accepted_at' => $assignment->accepted_at ?? $now,
+                'rejected_at' => null,
+                'rejection_reason' => null,
+            ];
+
+            if ($assignment->task->status === TaskStatus::Active) {
+                $updates['status'] = AssignmentStatus::Active;
+                $updates['next_reply_due_at'] = $assignment->next_reply_due_at ?? $now->copy()->addHour();
+            }
+
+            $assignment->update($updates);
+
+            $assignment->refresh()->load(['task.assignedBy', 'user']);
+            $this->fcmService->sendTaskAssignmentAcceptedNotification($assignment);
+
+            return $assignment;
+        }, attempts: 3);
+    }
+
+    public function rejectAssignment(User $employee, TaskAssignment $assignment, string $reason): TaskAssignment
+    {
+        return DB::transaction(function () use ($employee, $assignment, $reason): TaskAssignment {
+            $assignment = TaskAssignment::query()
+                ->with('task.assignedBy')
+                ->whereKey($assignment->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($assignment->user_id !== $employee->id) {
+                abort(404, 'Assignment not found.');
+            }
+
+            if (in_array($assignment->status, [
+                AssignmentStatus::Completed,
+                AssignmentStatus::Cancelled,
+                AssignmentStatus::Rejected,
+            ], true)) {
+                throw new DomainException('This assignment cannot be rejected.');
+            }
+
+            $assignment->update([
+                'status' => AssignmentStatus::Rejected,
+                'rejected_at' => now(),
+                'rejection_reason' => $reason,
+                'next_reply_due_at' => null,
+            ]);
+
+            $this->cancelTaskWhenAllAssignmentsRejectedOrCancelled($assignment->task);
+
+            $assignment->refresh()->load(['task.assignedBy', 'user']);
+            $this->fcmService->sendTaskAssignmentRejectedNotification($assignment);
+
+            return $assignment;
+        }, attempts: 3);
     }
 
     public function completeAssignment(TaskAssignment $assignment): TaskAssignment
@@ -222,7 +340,54 @@ class TaskService
                 'completed_at' => now(),
             ]);
 
-            return $assignment->refresh()->load(['task', 'user']);
+            return $assignment->refresh()->load(['task.assignedBy', 'user']);
+        }, attempts: 3);
+    }
+
+    public function delete(Task $task): int
+    {
+        return $this->deleteMany([$task->id]);
+    }
+
+    /**
+     * @param  list<int>  $taskIds
+     */
+    public function deleteMany(array $taskIds): int
+    {
+        return DB::transaction(function () use ($taskIds): int {
+            $tasks = Task::query()
+                ->whereIn('id', $taskIds)
+                ->lockForUpdate()
+                ->get();
+
+            $now = now();
+            $deletedCount = 0;
+
+            foreach ($tasks as $task) {
+                if (in_array($task->status, [TaskStatus::Pending, TaskStatus::Active], true)) {
+                    $task->update([
+                        'status' => TaskStatus::Cancelled,
+                        'cancelled_at' => $now,
+                        'cancel_reason' => $task->cancel_reason ?? 'Task deleted by admin.',
+                    ]);
+
+                    $task->assignments()
+                        ->whereIn('status', [
+                            AssignmentStatus::Pending->value,
+                            AssignmentStatus::Active->value,
+                        ])
+                        ->update([
+                            'status' => AssignmentStatus::Cancelled,
+                            'cancelled_at' => $now,
+                        ]);
+                }
+
+                if ($task->delete()) {
+                    $deletedCount++;
+                }
+            }
+
+            return $deletedCount;
         }, attempts: 3);
     }
 
@@ -241,10 +406,13 @@ class TaskService
         $busyAssignments = TaskAssignment::query()
             ->with(['task', 'user'])
             ->whereIn('user_id', $employeeIds)
-            ->whereIn('status', [
-                AssignmentStatus::Pending->value,
-                AssignmentStatus::Active->value,
-            ])
+            ->where(function ($query): void {
+                $query->where('status', AssignmentStatus::Active->value)
+                    ->orWhere(function ($query): void {
+                        $query->where('status', AssignmentStatus::Pending->value)
+                            ->whereNotNull('accepted_at');
+                    });
+            })
             ->lockForUpdate()
             ->get();
 
@@ -274,5 +442,31 @@ class TaskService
         if (in_array($task->status, [TaskStatus::Completed, TaskStatus::Cancelled], true)) {
             throw new DomainException('Completed or cancelled tasks cannot be changed.');
         }
+    }
+
+    private function cancelTaskWhenAllAssignmentsRejectedOrCancelled(Task $task): void
+    {
+        $task->refresh();
+
+        if (! in_array($task->status, [TaskStatus::Pending, TaskStatus::Active], true)) {
+            return;
+        }
+
+        $hasOpenAssignments = $task->assignments()
+            ->whereNotIn('status', [
+                AssignmentStatus::Rejected->value,
+                AssignmentStatus::Cancelled->value,
+            ])
+            ->exists();
+
+        if ($hasOpenAssignments) {
+            return;
+        }
+
+        $task->update([
+            'status' => TaskStatus::Cancelled,
+            'cancelled_at' => now(),
+            'cancel_reason' => 'All assignments were rejected or cancelled.',
+        ]);
     }
 }

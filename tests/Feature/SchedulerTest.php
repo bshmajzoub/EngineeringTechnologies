@@ -25,7 +25,7 @@ class SchedulerTest extends TestCase
             'start_at' => now()->subMinute(),
         ]);
 
-        $assignment = TaskAssignment::factory()->pending()->for($task)->for($employee, 'user')->create();
+        $assignment = TaskAssignment::factory()->accepted()->for($task)->for($employee, 'user')->create();
 
         $this->artisan('tasks:activate-due')
             ->assertExitCode(0);
@@ -56,6 +56,27 @@ class SchedulerTest extends TestCase
         $task->refresh();
 
         $this->assertEquals(TaskStatus::Pending, $task->status);
+    }
+
+    public function test_activate_due_tasks_does_not_activate_unaccepted_assignments(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->employee()->create();
+
+        $task = Task::factory()->for($admin, 'creator')->create([
+            'status' => TaskStatus::Pending,
+            'task_date' => now()->toDateString(),
+            'start_at' => now()->subMinute(),
+        ]);
+
+        $assignment = TaskAssignment::factory()->pending()->for($task)->for($employee, 'user')->create();
+
+        $this->artisan('tasks:activate-due')
+            ->assertExitCode(0);
+
+        $this->assertEquals(TaskStatus::Pending, $task->refresh()->status);
+        $this->assertEquals(AssignmentStatus::Pending, $assignment->refresh()->status);
+        $this->assertNull($assignment->next_reply_due_at);
     }
 
     public function test_expire_outdated_tasks_command_cancels_old_tasks(): void

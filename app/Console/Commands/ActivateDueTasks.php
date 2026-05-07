@@ -28,8 +28,14 @@ class ActivateDueTasks extends Command
             ->where('status', TaskStatus::Pending)
             ->where('task_date', '<=', now()->toDateString())
             ->where('start_at', '<=', now())
+            ->whereHas('assignments', function ($query): void {
+                $query->where('status', AssignmentStatus::Pending)
+                    ->whereNotNull('accepted_at');
+            })
             ->with([
-                'assignments' => fn ($q) => $q->where('status', AssignmentStatus::Pending),
+                'assignments' => fn ($q) => $q
+                    ->where('status', AssignmentStatus::Pending)
+                    ->whereNotNull('accepted_at'),
                 'assignments.user.deviceTokens',
             ])
             ->get();
@@ -49,6 +55,7 @@ class ActivateDueTasks extends Command
                 // Bulk-update only the pending assignments on this task.
                 $task->assignments()
                     ->where('status', AssignmentStatus::Pending)
+                    ->whereNotNull('accepted_at')
                     ->update([
                         'status' => AssignmentStatus::Active,
                         'next_reply_due_at' => $now->copy()->addHour(),

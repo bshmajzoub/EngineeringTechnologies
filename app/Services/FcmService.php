@@ -32,9 +32,11 @@ class FcmService
         $this->dispatchToUser($user, [
             'type' => 'task_assigned',
             'task_id' => (string) $task->id,
+            'assignment_id' => (string) $assignment->id,
+            'assigned_by_id' => (string) $task->created_by,
+            'assigned_by_name' => (string) ($task->assignedBy?->name ?? $task->creator?->name ?? ''),
             'task_title' => $task->title,
             'task_date' => $task->task_date->toDateString(),
-            'assignment_id' => (string) $assignment->id,
             'notes' => (string) ($assignment->notes ?? ''),
             'title' => 'New Task Assigned',
             'body' => "You have been assigned to: {$task->title}",
@@ -99,6 +101,49 @@ class FcmService
             'cancel_reason' => $reason ?? '',
             'title' => 'Task Cancelled',
             'body' => "{$task->title} has been cancelled.",
+        ]);
+    }
+
+    public function sendTaskAssignmentAcceptedNotification(TaskAssignment $assignment): void
+    {
+        $task = $assignment->task;
+        $admin = $task->assignedBy;
+
+        if (! $admin instanceof User) {
+            return;
+        }
+
+        $this->dispatchToUser($admin, [
+            'type' => 'task_assignment_accepted',
+            'task_id' => (string) $task->id,
+            'assignment_id' => (string) $assignment->id,
+            'employee_id' => (string) $assignment->user_id,
+            'employee_name' => (string) ($assignment->user?->name ?? ''),
+            'task_title' => $task->title,
+            'title' => 'Task Assignment Accepted',
+            'body' => "{$assignment->user?->name} accepted: {$task->title}",
+        ]);
+    }
+
+    public function sendTaskAssignmentRejectedNotification(TaskAssignment $assignment): void
+    {
+        $task = $assignment->task;
+        $admin = $task->assignedBy;
+
+        if (! $admin instanceof User) {
+            return;
+        }
+
+        $this->dispatchToUser($admin, [
+            'type' => 'task_assignment_rejected',
+            'task_id' => (string) $task->id,
+            'assignment_id' => (string) $assignment->id,
+            'employee_id' => (string) $assignment->user_id,
+            'employee_name' => (string) ($assignment->user?->name ?? ''),
+            'task_title' => $task->title,
+            'rejection_reason' => (string) ($assignment->rejection_reason ?? ''),
+            'title' => 'Task Assignment Rejected',
+            'body' => "{$assignment->user?->name} rejected: {$task->title}",
         ]);
     }
 
@@ -221,6 +266,7 @@ class FcmService
                 'data' => $data,
                 'response' => $response->json(),
             ]);
+
             return;
         }
 

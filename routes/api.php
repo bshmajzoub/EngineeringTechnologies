@@ -52,6 +52,8 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 
     Route::middleware('role:employee')->prefix('assignments')->group(function () {
         Route::get('/my-current', [TaskAssignmentController::class, 'myCurrent']);
+        Route::patch('/{assignment}/accept', [TaskAssignmentController::class, 'accept']);
+        Route::patch('/{assignment}/reject', [TaskAssignmentController::class, 'reject']);
         Route::patch('/{assignment}/complete', [TaskAssignmentController::class, 'complete']);
         Route::post('/{assignment}/replies', [TaskReplyController::class, 'store']);
     });
@@ -61,6 +63,13 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
 Route::middleware(['auth:sanctum', 'active', 'role:admin'])
     ->prefix('admin')
     ->group(function () {
+        Route::get('/tasks', [TaskController::class, 'adminIndex']);
+        Route::delete('/tasks/{task}', [TaskController::class, 'destroy']);
+        Route::post('/tasks/bulk-delete', [TaskController::class, 'bulkDelete']);
+
+        Route::delete('/employees', [EmployeeController::class, 'deleteAllEmployees']);
+        Route::post('/employees/bulk-delete', [EmployeeController::class, 'bulkDelete']);
+        Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy']);
         Route::apiResource('employees', EmployeeController::class)->except(['destroy']);
         Route::patch('/employees/{employee}/toggle-active', [EmployeeController::class, 'toggleActive']);
     });

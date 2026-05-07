@@ -2,23 +2,25 @@
 
 namespace App\Http\Resources;
 
+use App\Enums\TaskStatus;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
+use Illuminate\Support\Carbon;
 
 /**
  * @property int $id
  * @property string $title
  * @property string|null $description
- * @property \Illuminate\Support\Carbon $task_date
- * @property \Illuminate\Support\Carbon $start_at
- * @property \Illuminate\Support\Carbon|null $end_at
- * @property \App\Enums\TaskStatus $status
+ * @property Carbon $task_date
+ * @property Carbon $start_at
+ * @property Carbon|null $end_at
+ * @property TaskStatus $status
  * @property int $created_by
- * @property \Illuminate\Support\Carbon|null $completed_at
- * @property \Illuminate\Support\Carbon|null $cancelled_at
+ * @property Carbon|null $completed_at
+ * @property Carbon|null $cancelled_at
  * @property string|null $cancel_reason
- * @property \Illuminate\Support\Carbon $created_at
- * @property \Illuminate\Support\Carbon $updated_at
+ * @property Carbon $created_at
+ * @property Carbon $updated_at
  */
 class TaskResource extends JsonResource
 {
@@ -42,6 +44,7 @@ class TaskResource extends JsonResource
             'cancelled_at' => $this->cancelled_at?->toIso8601String(),
             'cancel_reason' => $this->cancel_reason,
             'creator' => new UserResource($this->whenLoaded('creator')),
+            'assigned_by' => new UserResource($this->whenLoaded('assignedBy')),
             'assignments' => TaskAssignmentResource::collection($this->whenLoaded('assignments')),
             'created_at' => $this->created_at->toIso8601String(),
             'updated_at' => $this->updated_at->toIso8601String(),

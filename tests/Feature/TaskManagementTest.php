@@ -65,6 +65,7 @@ class TaskManagementTest extends TestCase
 
         TaskAssignment::factory()->for($existingTask)->for($employee, 'user')->create([
             'status' => AssignmentStatus::Pending,
+            'accepted_at' => now(),
         ]);
 
         Sanctum::actingAs($admin);
@@ -116,8 +117,8 @@ class TaskManagementTest extends TestCase
         $employeeOne = User::factory()->employee()->create();
         $employeeTwo = User::factory()->employee()->create();
         $task = Task::factory()->for($admin, 'creator')->create();
-        $assignmentOne = TaskAssignment::factory()->for($task)->for($employeeOne, 'user')->create();
-        $assignmentTwo = TaskAssignment::factory()->for($task)->for($employeeTwo, 'user')->create();
+        $assignmentOne = TaskAssignment::factory()->accepted()->for($task)->for($employeeOne, 'user')->create();
+        $assignmentTwo = TaskAssignment::factory()->accepted()->for($task)->for($employeeTwo, 'user')->create();
 
         Sanctum::actingAs($admin);
 
@@ -187,5 +188,154 @@ class TaskManagementTest extends TestCase
             'start_at' => $startAt->toDateTimeString(),
             'employee_ids' => [$employee->id],
         ])->assertForbidden();
+    }
+
+    public function test_employee_can_accept_pending_assignment_before_start_time(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->employee()->create();
+        $task = Task::factory()->for($admin, 'creator')->create([
+            'status' => TaskStatus::Pending,
+            'start_at' => now()->addHour(),
+        ]);
+        $assignment = TaskAssignment::factory()->pending()->for($task)->for($employee, 'user')->create();
+
+        Sanctum::actingAs($employee);
+
+        $this->patchJson("/api/assignments/{$assignment->id}/accept")
+            ->assertOk()
+            ->assertJsonPath('data.status', AssignmentStatus::Pending->value)
+            ->assertJsonPath('data.assigned_by.id', $admin->id);
+
+        $assignment->refresh();
+
+        $this->assertNotNull($assignment->accepted_at);
+        $this->assertSame(AssignmentStatus::Pending, $assignment->status);
+    }
+
+    public function test_employee_can_accept_assignment_after_parent_task_is_active(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->employee()->create();
+        $task = Task::factory()->for($admin, 'creator')->create([
+            'status' => TaskStatus::Active,
+            'start_at' => now()->subHour(),
+        ]);
+        $assignment = TaskAssignment::factory()->pending()->for($task)->for($employee, 'user')->create();
+
+        Sanctum::actingAs($employee);
+
+        $this->patchJson("/api/assignments/{$assignment->id}/accept")
+            ->assertOk()
+            ->assertJsonPath('data.status', AssignmentStatus::Active->value);
+
+        $assignment->refresh();
+
+        $this->assertNotNull($assignment->accepted_at);
+        $this->assertNotNull($assignment->next_reply_due_at);
+    }
+
+    public function test_employee_can_reject_assignment_with_reason_and_all_rejected_cancels_task(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->employee()->create();
+        $task = Task::factory()->for($admin, 'creator')->create([
+            'status' => TaskStatus::Pending,
+        ]);
+        $assignment = TaskAssignment::factory()->pending()->for($task)->for($employee, 'user')->create();
+
+        Sanctum::actingAs($employee);
+
+        $this->patchJson("/api/assignments/{$assignment->id}/reject", [
+            'rejection_reason' => 'I am not available at this time.',
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.status', AssignmentStatus::Rejected->value)
+            ->assertJsonPath('data.rejection_reason', 'I am not available at this time.');
+
+        $assignment->refresh();
+        $task->refresh();
+
+        $this->assertNotNull($assignment->rejected_at);
+        $this->assertSame(TaskStatus::Cancelled, $task->status);
+        $this->assertSame('All assignments were rejected or cancelled.', $task->cancel_reason);
+    }
+
+    public function test_reject_assignment_requires_reason_and_wrong_employee_gets_404(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->employee()->create();
+        $otherEmployee = User::factory()->employee()->create();
+        $task = Task::factory()->for($admin, 'creator')->create();
+        $assignment = TaskAssignment::factory()->pending()->for($task)->for($employee, 'user')->create();
+
+        Sanctum::actingAs($employee);
+
+        $this->patchJson("/api/assignments/{$assignment->id}/reject", [
+            'rejection_reason' => '',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['rejection_reason']);
+
+        Sanctum::actingAs($otherEmployee);
+
+        $this->patchJson("/api/assignments/{$assignment->id}/accept")
+            ->assertNotFound();
+    }
+
+    public function test_rejected_assignment_does_not_block_parent_task_completion(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employeeOne = User::factory()->employee()->create();
+        $employeeTwo = User::factory()->employee()->create();
+        $task = Task::factory()->for($admin, 'creator')->create([
+            'status' => TaskStatus::Active,
+        ]);
+        $activeAssignment = TaskAssignment::factory()->active()->for($task)->for($employeeOne, 'user')->create();
+        TaskAssignment::factory()->rejected()->for($task)->for($employeeTwo, 'user')->create();
+
+        Sanctum::actingAs($employeeOne);
+
+        $this->patchJson("/api/assignments/{$activeAssignment->id}/complete")
+            ->assertOk();
+
+        $this->assertSame(TaskStatus::Completed, $task->refresh()->status);
+    }
+
+    public function test_admin_can_search_and_delete_tasks(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->employee()->create(['name' => 'Machine Operator']);
+        $matchingTask = Task::factory()->for($admin, 'creator')->create([
+            'title' => 'Machine Calibration',
+            'status' => TaskStatus::Active,
+            'task_date' => '2026-05-03',
+        ]);
+        $otherTask = Task::factory()->for($admin, 'creator')->create([
+            'title' => 'Packaging',
+            'task_date' => '2026-05-04',
+        ]);
+        TaskAssignment::factory()->active()->for($matchingTask)->for($employee, 'user')->create();
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson("/api/admin/tasks?q=machine&status=active&employee_id={$employee->id}&date_from=2026-05-01&date_to=2026-05-05")
+            ->assertOk()
+            ->assertJsonPath('data.tasks.0.id', $matchingTask->id)
+            ->assertJsonPath('data.tasks.0.assigned_by.id', $admin->id)
+            ->assertJsonPath('data.pagination.per_page', 15);
+
+        $this->deleteJson("/api/admin/tasks/{$matchingTask->id}")
+            ->assertOk()
+            ->assertJsonPath('data.deleted_count', 1);
+
+        $this->postJson('/api/admin/tasks/bulk-delete', [
+            'task_ids' => [$otherTask->id],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.deleted_count', 1);
+
+        $this->assertSoftDeleted($matchingTask);
+        $this->assertSoftDeleted($otherTask);
     }
 }

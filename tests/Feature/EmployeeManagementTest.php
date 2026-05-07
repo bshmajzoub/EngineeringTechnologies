@@ -126,4 +126,58 @@ class EmployeeManagementTest extends TestCase
             ->assertForbidden()
             ->assertJsonPath('success', false);
     }
+
+    public function test_admin_can_search_update_active_state_and_delete_employees(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employeeOne = User::factory()->employee()->create([
+            'name' => 'Ahmad Operator',
+            'email' => 'ahmad.operator@example.com',
+            'phone' => '+963900000001',
+        ]);
+        $employeeTwo = User::factory()->employee()->create([
+            'name' => 'Other Employee',
+            'email' => 'other.employee@example.com',
+        ]);
+        $employeeThree = User::factory()->employee()->create();
+        $token = $employeeOne->createToken('mobile')->plainTextToken;
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/admin/employees?q=ahmad&is_active=1&per_page=25')
+            ->assertOk()
+            ->assertJsonPath('data.employees.0.id', $employeeOne->id)
+            ->assertJsonPath('data.pagination.per_page', 25);
+
+        $this->putJson("/api/admin/employees/{$employeeOne->id}", [
+            'name' => 'Ahmad Operator',
+            'email' => 'ahmad.operator@example.com',
+            'password' => null,
+            'is_active' => false,
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.is_active', false);
+
+        $this->assertNotEmpty($token);
+        $this->assertCount(0, $employeeOne->refresh()->tokens);
+
+        $this->deleteJson("/api/admin/employees/{$employeeOne->id}")
+            ->assertOk()
+            ->assertJsonPath('data.deleted_count', 1);
+
+        $this->postJson('/api/admin/employees/bulk-delete', [
+            'employee_ids' => [$employeeTwo->id],
+        ])
+            ->assertOk()
+            ->assertJsonPath('data.deleted_count', 1);
+
+        $this->deleteJson('/api/admin/employees')
+            ->assertOk()
+            ->assertJsonPath('data.deleted_count', 1);
+
+        $this->assertSoftDeleted($employeeOne);
+        $this->assertSoftDeleted($employeeTwo);
+        $this->assertSoftDeleted($employeeThree);
+        $this->assertNotSoftDeleted($admin);
+    }
 }

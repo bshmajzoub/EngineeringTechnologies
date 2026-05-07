@@ -25,6 +25,9 @@ class TaskAssignmentFactory extends Factory
             'user_id' => User::factory()->employee(),
             'status' => AssignmentStatus::Pending,
             'notes' => fake()->optional()->sentence(),
+            'accepted_at' => null,
+            'rejected_at' => null,
+            'rejection_reason' => null,
             'last_reply_at' => null,
             'next_reply_due_at' => null,
             'last_reminder_sent_at' => null,
@@ -45,6 +48,7 @@ class TaskAssignmentFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'status' => AssignmentStatus::Active,
+            'accepted_at' => now(),
             'next_reply_due_at' => now()->addHour(),
         ]);
     }
@@ -53,7 +57,25 @@ class TaskAssignmentFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'status' => AssignmentStatus::Completed,
+            'accepted_at' => now(),
             'completed_at' => now(),
+        ]);
+    }
+
+    public function accepted(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => AssignmentStatus::Pending,
+            'accepted_at' => now(),
+        ]);
+    }
+
+    public function rejected(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'status' => AssignmentStatus::Rejected,
+            'rejected_at' => now(),
+            'rejection_reason' => fake()->sentence(),
         ]);
     }
 }

@@ -8,6 +8,7 @@ enum AssignmentStatus: string
     case Active = 'active';
     case Completed = 'completed';
     case Cancelled = 'cancelled';
+    case Rejected = 'rejected';
 
     /**
      * @return list<string>

@@ -3,15 +3,17 @@
 namespace App\Models;
 
 use App\Enums\TaskStatus;
+use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Task extends Model
 {
-    /** @use HasFactory<\Database\Factories\TaskFactory> */
-    use HasFactory;
+    /** @use HasFactory<TaskFactory> */
+    use HasFactory, SoftDeletes;
 
     /**
      * The attributes that are mass assignable.
@@ -50,6 +52,12 @@ class Task extends Model
 
     /** @return BelongsTo<User, $this> */
     public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    /** @return BelongsTo<User, $this> */
+    public function assignedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');
     }

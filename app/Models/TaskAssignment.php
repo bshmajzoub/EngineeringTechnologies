@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\AssignmentStatus;
+use Database\Factories\TaskAssignmentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -10,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class TaskAssignment extends Model
 {
-    /** @use HasFactory<\Database\Factories\TaskAssignmentFactory> */
+    /** @use HasFactory<TaskAssignmentFactory> */
     use HasFactory;
 
     /**
@@ -23,6 +24,9 @@ class TaskAssignment extends Model
         'user_id',
         'status',
         'notes',
+        'accepted_at',
+        'rejected_at',
+        'rejection_reason',
         'last_reply_at',
         'next_reply_due_at',
         'last_reminder_sent_at',
@@ -40,6 +44,8 @@ class TaskAssignment extends Model
     {
         return [
             'status' => AssignmentStatus::class,
+            'accepted_at' => 'datetime',
+            'rejected_at' => 'datetime',
             'last_reply_at' => 'datetime',
             'next_reply_due_at' => 'datetime',
             'last_reminder_sent_at' => 'datetime',

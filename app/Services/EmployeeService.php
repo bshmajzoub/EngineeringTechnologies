@@ -4,11 +4,36 @@ namespace App\Services;
 
 use App\Enums\UserRole;
 use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 
 class EmployeeService
 {
+    /**
+     * @param  array{q?: string|null, is_active?: bool|int|string|null}  $filters
+     * @return LengthAwarePaginator<int, User>
+     */
+    public function list(array $filters, int $perPage): LengthAwarePaginator
+    {
+        return User::query()
+            ->where('role', UserRole::Employee->value)
+            ->when($filters['q'] ?? null, function ($query, string $search): void {
+                $query->where(function ($query) use ($search): void {
+                    $query->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                });
+            })
+            ->when(
+                array_key_exists('is_active', $filters),
+                fn ($query) => $query->where('is_active', filter_var($filters['is_active'], FILTER_VALIDATE_BOOLEAN)),
+            )
+            ->latest('id')
+            ->paginate($perPage)
+            ->withQueryString();
+    }
+
     /**
      * @param  array{name: string, email: string, password: string, phone?: string|null}  $data
      */
@@ -27,7 +52,7 @@ class EmployeeService
     }
 
     /**
-     * @param  array{name?: string, email?: string, password?: string|null, phone?: string|null}  $data
+     * @param  array{name?: string, email?: string, password?: string|null, phone?: string|null, is_active?: bool}  $data
      */
     public function update(User $employee, array $data): User
     {
@@ -41,6 +66,10 @@ class EmployeeService
             }
 
             $employee->update($data);
+
+            if (array_key_exists('is_active', $data) && ! $employee->is_active) {
+                $employee->tokens()->delete();
+            }
 
             return $employee->refresh();
         });
@@ -59,5 +88,47 @@ class EmployeeService
 
             return $employee->refresh();
         });
+    }
+
+    public function delete(User $employee): int
+    {
+        return $this->deleteMany([$employee->id]);
+    }
+
+    /**
+     * @param  list<int>  $employeeIds
+     */
+    public function deleteMany(array $employeeIds): int
+    {
+        return DB::transaction(function () use ($employeeIds): int {
+            $employees = User::query()
+                ->whereIn('id', $employeeIds)
+                ->where('role', UserRole::Employee->value)
+                ->lockForUpdate()
+                ->get();
+
+            $deletedCount = 0;
+
+            foreach ($employees as $employee) {
+                $employee->tokens()->delete();
+
+                if ($employee->delete()) {
+                    $deletedCount++;
+                }
+            }
+
+            return $deletedCount;
+        });
+    }
+
+    public function deleteAllEmployees(): int
+    {
+        $employeeIds = User::query()
+            ->where('role', UserRole::Employee->value)
+            ->pluck('id')
+            ->map(fn (int|string $employeeId): int => (int) $employeeId)
+            ->all();
+
+        return $this->deleteMany($employeeIds);
     }
 }

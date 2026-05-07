@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Factory Task Management API",
-    "description": "Complete API collection after QA fixes (Batches 1-3). Base URL: http://localhost:8000/api\n\nVariables:\n- base_url: http://localhost:8000/api\n- admin_token: (set after login as admin)\n- employee_token: (set after login as employee)\n- task_id, assignment_id, employee_id: set as needed",
+    "description": "Complete API collection after QA fixes and update phase planning. Base URL: http://localhost:8000/api\n\nVariables:\n- base_url: http://localhost:8000/api\n- admin_token: (set after login as admin)\n- employee_token: (set after login as employee)\n- task_id, assignment_id, employee_id: set as needed\n- employee_ids, task_ids: comma-separated examples for bulk delete bodies",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -10,7 +10,9 @@
     { "key": "employee_token", "value": "", "type": "string" },
     { "key": "task_id", "value": "1", "type": "string" },
     { "key": "assignment_id", "value": "1", "type": "string" },
-    { "key": "employee_id", "value": "2", "type": "string" }
+    { "key": "employee_id", "value": "2", "type": "string" },
+    { "key": "employee_ids", "value": "2,3,4", "type": "string" },
+    { "key": "task_ids", "value": "10,11,12", "type": "string" }
   ],
   "item": [
     {
@@ -153,7 +155,28 @@
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{admin_token}}" }
             ],
-            "url": { "raw": "{{base_url}}/admin/employees", "host": ["{{base_url}}"], "path": ["admin", "employees"] }
+            "url": { "raw": "{{base_url}}/admin/employees", "host": ["{{base_url}}"], "path": ["admin", "employees"] },
+            "description": "Default employee list. Planned response should be paginated and exclude soft-deleted users."
+          }
+        },
+        {
+          "name": "Search Employees",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/employees?q=ahmad&is_active=1&per_page=25",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "employees"],
+              "query": [
+                { "key": "q", "value": "ahmad", "description": "Searches name, email, and phone." },
+                { "key": "is_active", "value": "1", "description": "Use 1 or 0." },
+                { "key": "per_page", "value": "25", "description": "Default 15, max 100." }
+              ]
+            }
           }
         },
         {
@@ -194,10 +217,11 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"name\": \"Ahmed Mohamed Updated\",\n    \"email\": \"ahmed.updated@factory.com\",\n    \"phone\": \"+966509999999\"\n}",
+              "raw": "{\n    \"name\": \"Ahmed Mohamed Updated\",\n    \"email\": \"ahmed.updated@factory.com\",\n    \"phone\": \"+966509999999\",\n    \"password\": null,\n    \"is_active\": true\n}",
               "options": { "raw": { "language": "json" } }
             },
-            "url": { "raw": "{{base_url}}/admin/employees/{{employee_id}}", "host": ["{{base_url}}"], "path": ["admin", "employees", "{{employee_id}}"] }
+            "url": { "raw": "{{base_url}}/admin/employees/{{employee_id}}", "host": ["{{base_url}}"], "path": ["admin", "employees", "{{employee_id}}"] },
+            "description": "Role is not editable here. Empty/null password should not update password. Setting is_active=false revokes tokens."
           }
         },
         {
@@ -210,6 +234,47 @@
             ],
             "url": { "raw": "{{base_url}}/admin/employees/{{employee_id}}/toggle-active", "host": ["{{base_url}}"], "path": ["admin", "employees", "{{employee_id}}", "toggle-active"] },
             "description": "Deactivating revokes all Sanctum tokens for that employee immediately."
+          }
+        },
+        {
+          "name": "Delete Employee",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/admin/employees/{{employee_id}}", "host": ["{{base_url}}"], "path": ["admin", "employees", "{{employee_id}}"] },
+            "description": "Admin only. Should not delete admins or current authenticated admin. Preferred behavior: soft-delete employee and revoke tokens."
+          }
+        },
+        {
+          "name": "Bulk Delete Employees",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"employee_ids\": [2, 3, 4]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/admin/employees/bulk-delete", "host": ["{{base_url}}"], "path": ["admin", "employees", "bulk-delete"] },
+            "description": "Expected success data: deleted_count. Must reject admin IDs and current authenticated admin."
+          }
+        },
+        {
+          "name": "Delete All Employees Except Admins",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/admin/employees", "host": ["{{base_url}}"], "path": ["admin", "employees"] },
+            "description": "Admin only. Deletes/soft-deletes all users with role=employee. Must preserve admins and task history."
           }
         }
       ]
@@ -225,7 +290,33 @@
               { "key": "Accept", "value": "application/json" },
               { "key": "Authorization", "value": "Bearer {{admin_token}}" }
             ],
-            "url": { "raw": "{{base_url}}/tasks", "host": ["{{base_url}}"], "path": ["tasks"] }
+            "url": { "raw": "{{base_url}}/tasks", "host": ["{{base_url}}"], "path": ["tasks"] },
+            "description": "Existing route. Admin receives all visible tasks. Planned resources should include assigned_by."
+          }
+        },
+        {
+          "name": "Search Tasks (Admin)",
+          "request": {
+            "method": "GET",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": {
+              "raw": "{{base_url}}/admin/tasks?q=machine&status=active&employee_id={{employee_id}}&date_from=2026-05-01&date_to=2026-05-05&per_page=25",
+              "host": ["{{base_url}}"],
+              "path": ["admin", "tasks"],
+              "query": [
+                { "key": "q", "value": "machine", "description": "Searches task title, description, and assigned employee name/email when practical." },
+                { "key": "status", "value": "active", "description": "pending, active, completed, cancelled." },
+                { "key": "employee_id", "value": "{{employee_id}}" },
+                { "key": "task_date", "value": "", "disabled": true },
+                { "key": "date_from", "value": "2026-05-01" },
+                { "key": "date_to", "value": "2026-05-05" },
+                { "key": "per_page", "value": "25", "description": "Default 15, max 100." }
+              ]
+            },
+            "description": "New admin search endpoint. Use eager loading to avoid N+1 and return paginated results."
           }
         },
         {
@@ -318,6 +409,35 @@
             "url": { "raw": "{{base_url}}/tasks/{{task_id}}/cancel", "host": ["{{base_url}}"], "path": ["tasks", "{{task_id}}", "cancel"] },
             "description": "Cancels all pending/active assignments. FCM task_cancelled sent. Returns 409 if already cancelled/completed."
           }
+        },
+        {
+          "name": "Delete Task",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/admin/tasks/{{task_id}}", "host": ["{{base_url}}"], "path": ["admin", "tasks", "{{task_id}}"] },
+            "description": "Admin only. Preferred behavior: cancel active/pending task then soft-delete to preserve assignments/replies history."
+          }
+        },
+        {
+          "name": "Bulk Delete Tasks",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{admin_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"task_ids\": [10, 11, 12]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/admin/tasks/bulk-delete", "host": ["{{base_url}}"], "path": ["admin", "tasks", "bulk-delete"] },
+            "description": "Expected success data: deleted_count. Active/pending tasks should be cancelled before soft-delete."
+          }
         }
       ]
     },
@@ -369,7 +489,53 @@
               { "key": "Authorization", "value": "Bearer {{employee_token}}" }
             ],
             "url": { "raw": "{{base_url}}/assignments/my-current", "host": ["{{base_url}}"], "path": ["assignments", "my-current"] },
-            "description": "Returns the employee's current pending or active assignment, or null."
+            "description": "Returns the employee's current pending or active assignment, or null. Planned response includes assigned_by."
+          }
+        },
+        {
+          "name": "Accept Assignment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "url": { "raw": "{{base_url}}/assignments/{{assignment_id}}/accept", "host": ["{{base_url}}"], "path": ["assignments", "{{assignment_id}}", "accept"] },
+            "description": "Employee can only accept their own pending assignment. If accepted before task start, assignment remains pending. If parent task is already active, assignment becomes active and next_reply_due_at is set."
+          }
+        },
+        {
+          "name": "Reject Assignment",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"rejection_reason\": \"I am not available at this time.\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/assignments/{{assignment_id}}/reject", "host": ["{{base_url}}"], "path": ["assignments", "{{assignment_id}}", "reject"] },
+            "description": "Employee can only reject their own pending/active eligible assignment. rejection_reason is required. Rejected assignments should not activate, block task completion, or count as busy."
+          }
+        },
+        {
+          "name": "Reject Assignment - Missing Reason (422)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"rejection_reason\": \"\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/assignments/{{assignment_id}}/reject", "host": ["{{base_url}}"], "path": ["assignments", "{{assignment_id}}", "reject"] },
+            "description": "Expected: 422 validation error because rejection_reason is required."
           }
         },
         {

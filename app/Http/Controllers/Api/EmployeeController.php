@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Api;
 
 use App\Enums\UserRole;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Employee\BulkDeleteEmployeesRequest;
+use App\Http\Requests\Employee\IndexEmployeeRequest;
 use App\Http\Requests\Employee\StoreEmployeeRequest;
 use App\Http\Requests\Employee\UpdateEmployeeRequest;
 use App\Http\Resources\UserResource;
@@ -18,15 +20,18 @@ class EmployeeController extends Controller
 
     public function __construct(private readonly EmployeeService $employeeService) {}
 
-    public function index(): JsonResponse
+    public function index(IndexEmployeeRequest $request): JsonResponse
     {
-        $employees = User::query()
-            ->where('role', UserRole::Employee->value)
-            ->latest('id')
-            ->get();
+        $employees = $this->employeeService->list($request->validated(), $request->perPage());
 
         return $this->success([
-            'employees' => UserResource::collection($employees),
+            'employees' => UserResource::collection($employees->getCollection()),
+            'pagination' => [
+                'current_page' => $employees->currentPage(),
+                'per_page' => $employees->perPage(),
+                'total' => $employees->total(),
+                'last_page' => $employees->lastPage(),
+            ],
         ], 'Employees retrieved successfully.');
     }
 
@@ -74,6 +79,43 @@ class EmployeeController extends Controller
             : 'Employee deactivated successfully.';
 
         return $this->success(new UserResource($employee), $message);
+    }
+
+    public function destroy(User $employee): JsonResponse
+    {
+        if (! $this->isEmployee($employee)) {
+            return $this->employeeNotFoundResponse();
+        }
+
+        $deletedCount = $this->employeeService->delete($employee);
+
+        return $this->success([
+            'deleted_count' => $deletedCount,
+        ], 'Employees deleted successfully.');
+    }
+
+    public function bulkDelete(BulkDeleteEmployeesRequest $request): JsonResponse
+    {
+        $employeeIds = collect($request->validated('employee_ids'))
+            ->map(fn (int|string $employeeId): int => (int) $employeeId)
+            ->unique()
+            ->values()
+            ->all();
+
+        $deletedCount = $this->employeeService->deleteMany($employeeIds);
+
+        return $this->success([
+            'deleted_count' => $deletedCount,
+        ], 'Employees deleted successfully.');
+    }
+
+    public function deleteAllEmployees(): JsonResponse
+    {
+        $deletedCount = $this->employeeService->deleteAllEmployees();
+
+        return $this->success([
+            'deleted_count' => $deletedCount,
+        ], 'Employees deleted successfully.');
     }
 
     private function isEmployee(User $user): bool
