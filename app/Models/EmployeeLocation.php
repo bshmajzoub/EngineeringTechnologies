@@ -18,6 +18,9 @@ class EmployeeLocation extends Model
         'latitude',
         'longitude',
         'accuracy',
+        'speed',
+        'heading',
+        'recorded_at',
         'created_at',
     ];
 
@@ -25,6 +28,9 @@ class EmployeeLocation extends Model
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
         'accuracy' => 'float',
+        'speed' => 'float',
+        'heading' => 'float',
+        'recorded_at' => 'datetime',
         'created_at' => 'datetime',
     ];
 

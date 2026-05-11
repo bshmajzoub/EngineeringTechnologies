@@ -3,12 +3,12 @@
 namespace Tests\Feature;
 
 use App\Enums\LocationRequestStatus;
-use App\Enums\UserRole;
-use App\Models\EmployeeLocation;
+use App\Jobs\SendFcmNotification;
 use App\Models\LiveEmployeeLocation;
 use App\Models\LocationRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -31,9 +31,12 @@ class LocationSystemTest extends TestCase
         $response
             ->assertOk()
             ->assertJsonPath('success', true)
+            ->assertJsonPath('data.interval_seconds', 5)
             ->assertJsonStructure([
                 'data' => [
                     'location_request_id',
+                    'tracking_session_id',
+                    'interval_seconds',
                     'expires_at',
                 ],
             ]);
@@ -41,7 +44,49 @@ class LocationSystemTest extends TestCase
         $this->assertDatabaseHas('location_requests', [
             'requested_by' => $admin->id,
             'status' => LocationRequestStatus::Active,
+            'interval_seconds' => 5,
         ]);
+    }
+
+    public function test_location_request_dispatches_start_live_tracking_payload(): void
+    {
+        Queue::fake();
+        config(['fcm.firebase_rtdb_url' => 'https://engiflow-2aaea-default-rtdb.firebaseio.com']);
+
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->employee()->create();
+
+        $employee->deviceTokens()->create([
+            'token' => 'live_tracking_token_123',
+            'device_info' => 'Test Device',
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $response = $this->postJson('/api/location/request', [
+            'employee_ids' => [$employee->id],
+            'interval_seconds' => 7,
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('data.interval_seconds', 7);
+
+        $trackingSessionId = (string) $response->json('data.tracking_session_id');
+
+        Queue::assertPushed(SendFcmNotification::class, function (SendFcmNotification $job) use ($employee, $trackingSessionId): bool {
+            $tokens = (fn (): array => $this->tokens)->call($job);
+            $data = (fn (): array => $this->data)->call($job);
+
+            $this->assertSame(['live_tracking_token_123'], $tokens);
+            $this->assertSame('start_live_tracking', $data['type']);
+            $this->assertSame($trackingSessionId, $data['tracking_session_id']);
+            $this->assertSame("/live_locations/{$employee->id}", $data['firebase_path']);
+            $this->assertSame('https://engiflow-2aaea-default-rtdb.firebaseio.com', $data['firebase_rtdb_url']);
+            $this->assertSame('7', $data['interval_seconds']);
+
+            return true;
+        });
     }
 
     public function test_admin_can_request_locations_for_all_employees(): void
@@ -109,6 +154,92 @@ class LocationSystemTest extends TestCase
             'latitude' => 33.5138,
             'longitude' => 36.2765,
         ]);
+    }
+
+    public function test_employee_can_sync_location_batch(): void
+    {
+        $admin = User::factory()->admin()->create();
+        $employee = User::factory()->employee()->create();
+
+        $locationRequest = LocationRequest::create([
+            'requested_by' => $admin->id,
+            'status' => LocationRequestStatus::Active,
+            'expires_at' => now()->addMinutes(10),
+        ]);
+
+        $firstRecordedAt = now()->subMinutes(2)->setMicrosecond(0);
+        $secondRecordedAt = now()->subMinute()->setMicrosecond(0);
+
+        Sanctum::actingAs($employee);
+
+        $response = $this->postJson('/api/location/sync', [
+            'tracking_session_id' => $locationRequest->id,
+            'points' => [
+                [
+                    'lat' => 33.5138,
+                    'lng' => 36.2765,
+                    'accuracy' => 12.5,
+                    'speed' => 3.4,
+                    'heading' => 120.0,
+                    'recorded_at' => $firstRecordedAt->toDateTimeString(),
+                ],
+                [
+                    'lat' => 33.5200,
+                    'lng' => 36.2800,
+                    'accuracy' => 8.0,
+                    'speed' => 4.2,
+                    'heading' => 125.5,
+                    'recorded_at' => $secondRecordedAt->toDateTimeString(),
+                ],
+            ],
+        ]);
+
+        $response
+            ->assertOk()
+            ->assertJsonPath('success', true);
+
+        $this->assertDatabaseCount('employee_locations', 2);
+        $this->assertDatabaseHas('employee_locations', [
+            'user_id' => $employee->id,
+            'location_request_id' => $locationRequest->id,
+            'latitude' => 33.5138,
+            'longitude' => 36.2765,
+            'speed' => 3.4,
+            'heading' => 120.0,
+            'recorded_at' => $firstRecordedAt->toDateTimeString(),
+        ]);
+
+        $this->assertDatabaseHas('live_employee_locations', [
+            'user_id' => $employee->id,
+            'tracking_session_id' => $locationRequest->id,
+            'latitude' => 33.5200,
+            'longitude' => 36.2800,
+            'speed' => 4.2,
+            'heading' => 125.5,
+            'recorded_at' => $secondRecordedAt->toDateTimeString(),
+        ]);
+    }
+
+    public function test_location_batch_sync_validation(): void
+    {
+        $employee = User::factory()->employee()->create();
+
+        Sanctum::actingAs($employee);
+
+        $response = $this->postJson('/api/location/sync', [
+            'tracking_session_id' => 999,
+            'points' => [
+                [
+                    'lat' => 33.5138,
+                    'lng' => 36.2765,
+                    'recorded_at' => now()->addMinute()->toDateTimeString(),
+                ],
+            ],
+        ]);
+
+        $response
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['tracking_session_id', 'points.0.recorded_at']);
     }
 
     public function test_location_submission_updates_live_location(): void

@@ -16,6 +16,7 @@ class RequestLocationRequest extends FormRequest
     {
         return [
             'employee_ids' => ['nullable', 'array'],
+            'interval_seconds' => ['nullable', 'integer', 'min:1', 'max:60'],
             // Each ID must belong to an active employee — admin IDs and
             // inactive users are rejected at the validation layer.
             'employee_ids.*' => [

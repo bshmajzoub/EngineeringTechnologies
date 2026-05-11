@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "Factory Task Management API",
-    "description": "Complete API collection after QA fixes and update phase planning. Base URL: http://localhost:8000/api\n\nVariables:\n- base_url: http://localhost:8000/api\n- admin_token: (set after login as admin)\n- employee_token: (set after login as employee)\n- task_id, assignment_id, employee_id: set as needed\n- employee_ids, task_ids: comma-separated examples for bulk delete bodies",
+    "description": "Complete API collection after QA fixes and update phase planning. Base URL: http://localhost:8000/api\n\nVariables:\n- base_url: http://localhost:8000/api\n- admin_token: (set after login as admin)\n- employee_token: (set after login as employee)\n- task_id, assignment_id, employee_id: set as needed\n- tracking_session_id: set automatically after Location Request, used by Location Sync Batch\n- employee_ids, task_ids: comma-separated examples for bulk delete bodies",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -11,6 +11,7 @@
     { "key": "task_id", "value": "1", "type": "string" },
     { "key": "assignment_id", "value": "1", "type": "string" },
     { "key": "employee_id", "value": "2", "type": "string" },
+    { "key": "tracking_session_id", "value": "1", "type": "string" },
     { "key": "employee_ids", "value": "2,3,4", "type": "string" },
     { "key": "task_ids", "value": "10,11,12", "type": "string" }
   ],
@@ -608,6 +609,22 @@
       "item": [
         {
           "name": "Request Employee Locations (Admin - all active)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.tracking_session_id) {",
+                  "    pm.collectionVariables.set('tracking_session_id', json.data.tracking_session_id);",
+                  "} else if (json.data && json.data.location_request_id) {",
+                  "    pm.collectionVariables.set('tracking_session_id', json.data.location_request_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -616,15 +633,31 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{}",
+              "raw": "{\n    \"interval_seconds\": 5\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/location/request", "host": ["{{base_url}}"], "path": ["location", "request"] },
-            "description": "Omit employee_ids to target ALL active employees. Returns location_request_id and expires_at (10 min window). FCM location_requested sent via queue."
+            "description": "Omit employee_ids to target ALL active employees. Returns location_request_id, tracking_session_id, interval_seconds, and expires_at. FCM data type: start_live_tracking with firebase_path, firebase_rtdb_url, tracking_session_id, and interval_seconds."
           }
         },
         {
           "name": "Request Employee Locations (Admin - specific employees)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.data && json.data.tracking_session_id) {",
+                  "    pm.collectionVariables.set('tracking_session_id', json.data.tracking_session_id);",
+                  "} else if (json.data && json.data.location_request_id) {",
+                  "    pm.collectionVariables.set('tracking_session_id', json.data.location_request_id);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
           "request": {
             "method": "POST",
             "header": [
@@ -633,11 +666,11 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"employee_ids\": [2, 3]\n}",
+              "raw": "{\n    \"employee_ids\": [2, 3],\n    \"interval_seconds\": 5\n}",
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/location/request", "host": ["{{base_url}}"], "path": ["location", "request"] },
-            "description": "employee_ids must be active employees only. Admin IDs or inactive users return 422."
+            "description": "employee_ids must be active employees only. Admin IDs or inactive users return 422. Saves tracking_session_id into collection variables for the sync request."
           }
         },
         {
@@ -658,7 +691,24 @@
           }
         },
         {
-          "name": "Submit Location (Employee)",
+          "name": "Sync Location Batch (Employee)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Accept", "value": "application/json" },
+              { "key": "Authorization", "value": "Bearer {{employee_token}}" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"tracking_session_id\": {{tracking_session_id}},\n    \"points\": [\n        {\n            \"lat\": 24.7136,\n            \"lng\": 46.6753,\n            \"accuracy\": 12.5,\n            \"speed\": 3.4,\n            \"heading\": 120,\n            \"recorded_at\": \"2026-05-10 10:00:00\"\n        },\n        {\n            \"lat\": 24.7141,\n            \"lng\": 46.6761,\n            \"accuracy\": 9.8,\n            \"speed\": 4.1,\n            \"heading\": 124,\n            \"recorded_at\": \"2026-05-10 10:00:05\"\n        }\n    ]\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": { "raw": "{{base_url}}/location/sync", "host": ["{{base_url}}"], "path": ["location", "sync"] },
+            "description": "New hybrid tracking endpoint. Employee app sends periodic batches only; per-second GPS should go directly to Firebase RTDB. points max: 500. recorded_at must not be in the future."
+          }
+        },
+        {
+          "name": "Submit Location (Employee - Legacy)",
           "request": {
             "method": "POST",
             "header": [
@@ -671,7 +721,7 @@
               "options": { "raw": { "language": "json" } }
             },
             "url": { "raw": "{{base_url}}/location/submit", "host": ["{{base_url}}"], "path": ["location", "submit"] },
-            "description": "latitude: -90 to 90, longitude: -180 to 180. Stores in employee_locations (history) and live_employee_locations (current). Links to active location_request if exists."
+            "description": "Deprecated backward-compatible single-point endpoint for old app versions. New app versions should use POST /location/sync with tracking_session_id and points[]."
           }
         },
         {
@@ -683,7 +733,7 @@
               { "key": "Authorization", "value": "Bearer {{admin_token}}" }
             ],
             "url": { "raw": "{{base_url}}/location/live", "host": ["{{base_url}}"], "path": ["location", "live"] },
-            "description": "Returns latest known location for all employees who have submitted at least once."
+            "description": "Laravel fallback/initial load endpoint. Realtime dashboard should subscribe to Firebase RTDB path /live_locations/{employee_id}; this endpoint returns last-known locations from MySQL."
           }
         },
         {
@@ -695,7 +745,7 @@
               { "key": "Authorization", "value": "Bearer {{admin_token}}" }
             ],
             "url": { "raw": "{{base_url}}/location/live/{{employee_id}}", "host": ["{{base_url}}"], "path": ["location", "live", "{{employee_id}}"] },
-            "description": "Returns 404 if employee has never submitted location."
+            "description": "Laravel fallback/initial load for one employee. Returns 404 if employee has no last-known location."
           }
         }
       ]

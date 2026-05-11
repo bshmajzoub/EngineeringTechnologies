@@ -83,6 +83,7 @@ Route::middleware(['auth:sanctum', 'active'])->prefix('location')->group(functio
     });
 
     Route::middleware('role:employee')->group(function () {
+        Route::post('/sync', [LocationController::class, 'syncBatch']);
         Route::post('/submit', [LocationController::class, 'submit']);
     });
 });

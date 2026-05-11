@@ -16,10 +16,16 @@ class LocationRequest extends Model
         'requested_by',
         'status',
         'expires_at',
+        'interval_seconds',
+    ];
+
+    protected $attributes = [
+        'interval_seconds' => 5,
     ];
 
     protected $casts = [
         'expires_at' => 'datetime',
+        'interval_seconds' => 'integer',
         'status' => LocationRequestStatus::class,
     ];
 

@@ -14,9 +14,13 @@ class LiveEmployeeLocation extends Model
 
     protected $fillable = [
         'user_id',
+        'tracking_session_id',
         'latitude',
         'longitude',
         'accuracy',
+        'speed',
+        'heading',
+        'recorded_at',
         'updated_at',
     ];
 
@@ -24,11 +28,19 @@ class LiveEmployeeLocation extends Model
         'latitude' => 'decimal:7',
         'longitude' => 'decimal:7',
         'accuracy' => 'float',
+        'speed' => 'float',
+        'heading' => 'float',
+        'recorded_at' => 'datetime',
         'updated_at' => 'datetime',
     ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function trackingSession(): BelongsTo
+    {
+        return $this->belongsTo(LocationRequest::class, 'tracking_session_id');
     }
 }

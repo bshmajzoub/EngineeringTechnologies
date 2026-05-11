@@ -5,7 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Location\RequestLocationRequest;
 use App\Http\Requests\Location\SubmitLocationRequest;
-use App\Models\LocationRequest;
+use App\Http\Requests\Location\SyncLocationBatchRequest;
 use App\Services\LocationService;
 use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -20,15 +20,28 @@ class LocationController extends Controller
     {
         $locationRequest = $this->locationService->requestLocations(
             $request->user(),
-            $request->validated('employee_ids')
+            $request->validated('employee_ids'),
+            $request->validated('interval_seconds') ?? 5
         );
 
         return $this->success([
             'location_request_id' => $locationRequest->id,
+            'tracking_session_id' => $locationRequest->id,
+            'interval_seconds' => $locationRequest->interval_seconds,
             'expires_at' => $locationRequest->expires_at->toIso8601String(),
         ], 'Location request sent.');
     }
 
+    public function syncBatch(SyncLocationBatchRequest $request): JsonResponse
+    {
+        $this->locationService->syncBatchLocations($request->user(), $request->validated());
+
+        return $this->success(null, 'Location batch synced successfully.');
+    }
+
+    /**
+     * @deprecated Use syncBatch() via POST /api/location/sync for batched tracking updates.
+     */
     public function submit(SubmitLocationRequest $request): JsonResponse
     {
         $this->locationService->submitLocation($request->user(), $request->validated());
@@ -49,7 +62,7 @@ class LocationController extends Controller
     {
         $location = $this->locationService->getLiveLocationForUser($userId);
 
-        if (!$location) {
+        if (! $location) {
             return $this->error('Location not found for this employee.', 404);
         }
 

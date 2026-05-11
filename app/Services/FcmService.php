@@ -147,11 +147,12 @@ class FcmService
         ]);
     }
 
-    public function sendLocationRequestedNotification(array $employeeIds, int $locationRequestId): void
+    public function sendStartLiveTrackingNotification(array $employeeIds, int $trackingSessionId, int $intervalSeconds = 5): void
     {
         $users = User::whereIn('id', $employeeIds)
             ->with('deviceTokens')
             ->get();
+        $firebaseRtdbUrl = (string) config('fcm.firebase_rtdb_url', '');
 
         foreach ($users as $user) {
             $tokens = $user->deviceTokens->pluck('token')->toArray();
@@ -161,12 +162,24 @@ class FcmService
             }
 
             $this->dispatchToTokens($tokens, [
-                'type' => 'location_requested',
-                'location_request_id' => (string) $locationRequestId,
-                'title' => 'Location Request',
-                'body' => 'Your manager is requesting your current location.',
+                'type' => 'start_live_tracking',
+                'tracking_session_id' => (string) $trackingSessionId,
+                'location_request_id' => (string) $trackingSessionId,
+                'firebase_path' => "/live_locations/{$user->id}",
+                'firebase_rtdb_url' => $firebaseRtdbUrl,
+                'interval_seconds' => (string) $intervalSeconds,
+                'title' => 'Live Tracking Started',
+                'body' => 'Your manager is requesting live location tracking.',
             ]);
         }
+    }
+
+    /**
+     * @deprecated Use sendStartLiveTrackingNotification() for Firebase hybrid tracking.
+     */
+    public function sendLocationRequestedNotification(array $employeeIds, int $locationRequestId): void
+    {
+        $this->sendStartLiveTrackingNotification($employeeIds, $locationRequestId);
     }
 
     // ─── Delivery Helpers ───────────────────────────────────────────────────────
