@@ -13,7 +13,7 @@ use OpenApi\Attributes as OA;
     ),
     servers: [
         new OA\Server(url: 'http://127.0.0.1:8000', description: 'Local development server'),
-        new OA\Server(url: 'https://notifcation.teknovex.io/public/', description: 'Production server'),
+        new OA\Server(url: 'https://notify.teknovex.io/public', description: 'Production server'),
     ],
     security: [
         ['bearerAuth' => []],

@@ -14,7 +14,7 @@
             "description": "Local development server"
         },
         {
-            "url": "https://api.example.com",
+            "url": "https://notify.teknovex.io/public",
             "description": "Production server"
         }
     ],
