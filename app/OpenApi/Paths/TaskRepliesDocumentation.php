@@ -1,0 +1,14 @@
+<?php
+
+namespace App\OpenApi\Paths;
+
+use OpenApi\Attributes as OA;
+
+final class TaskRepliesDocumentation
+{
+    #[OA\Get(path: '/api/assignments/{assignment}/replies', operationId: 'assignmentRepliesIndex', summary: 'List assignment replies', description: 'Admins may view replies for any assignment. Employees may view replies for their own assignments.', tags: ['Task Replies'], security: [['bearerAuth' => []]], parameters: [new OA\Parameter(name: 'assignment', in: 'path', required: true, schema: new OA\Schema(type: 'integer'), example: 301)], responses: [new OA\Response(response: 200, description: 'Replies retrieved.', content: new OA\JsonContent(ref: '#/components/schemas/RepliesCollectionResponse')), new OA\Response(response: 401, description: 'Unauthenticated.', content: new OA\JsonContent(ref: '#/components/schemas/UnauthenticatedResponse')), new OA\Response(response: 403, description: 'Inactive user or policy denied.', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenResponse')), new OA\Response(response: 404, description: 'Assignment not found.', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundResponse'))])]
+    public function index(): void {}
+
+    #[OA\Post(path: '/api/assignments/{assignment}/replies', operationId: 'assignmentRepliesStore', summary: 'Create assignment reply', description: 'Employee-only. The assignment must belong to the authenticated employee and be active.', tags: ['Task Replies'], security: [['bearerAuth' => []]], parameters: [new OA\Parameter(name: 'assignment', in: 'path', required: true, schema: new OA\Schema(type: 'integer'), example: 301)], requestBody: new OA\RequestBody(required: true, content: new OA\JsonContent(required: ['content'], properties: [new OA\Property(property: 'content', type: 'string', minLength: 5, maxLength: 2000, example: 'Inspection is 50% complete.')], type: 'object')), responses: [new OA\Response(response: 201, description: 'Reply submitted.', content: new OA\JsonContent(ref: '#/components/schemas/ReplyResponse')), new OA\Response(response: 401, description: 'Unauthenticated.', content: new OA\JsonContent(ref: '#/components/schemas/UnauthenticatedResponse')), new OA\Response(response: 403, description: 'Employee role required, user inactive, or policy denied.', content: new OA\JsonContent(ref: '#/components/schemas/ForbiddenResponse')), new OA\Response(response: 404, description: 'Assignment not found.', content: new OA\JsonContent(ref: '#/components/schemas/NotFoundResponse')), new OA\Response(response: 409, description: 'Domain conflict.', content: new OA\JsonContent(ref: '#/components/schemas/ApiErrorResponse')), new OA\Response(response: 422, description: 'Validation error.', content: new OA\JsonContent(ref: '#/components/schemas/ValidationErrorResponse'))])]
+    public function store(): void {}
+}
