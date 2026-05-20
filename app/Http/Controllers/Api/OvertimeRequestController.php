@@ -12,27 +12,14 @@ use App\Traits\ApiResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
-/**
- * @OA\Tag(name="Overtime", description="Endpoints for managing overtime requests")
- */
+
 class OvertimeRequestController extends Controller
 {
     use ApiResponse;
 
     public function __construct(private readonly FcmService $fcmService) {}
 
-    /**
-     * @OA\Get(
-     *     path="/api/admin/overtime-requests",
-     *     summary="List all overtime requests",
-     *     tags={"Overtime"},
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\Parameter(name="per_page", in="query", required=false, @OA\Schema(type="integer")),
-     *
-     *     @OA\Response(response=200, description="Overtime requests retrieved successfully")
-     * )
-     */
+
     public function index(Request $request): JsonResponse
     {
         $requests = OvertimeRequest::query()
@@ -51,26 +38,7 @@ class OvertimeRequestController extends Controller
         ], 'Overtime requests retrieved successfully.');
     }
 
-    /**
-     * @OA\Post(
-     *     path="/api/overtime-requests",
-     *     summary="Submit an overtime request",
-     *     tags={"Overtime"},
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="date", type="string", format="date", example="2024-05-20"),
-     *             @OA\Property(property="requested_hours", type="number", format="float", example=2.5)
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=201, description="Overtime request created successfully")
-     * )
-     */
+
     public function store(StoreOvertimeRequest $request): JsonResponse
     {
         $overtimeRequest = OvertimeRequest::create([
@@ -85,27 +53,7 @@ class OvertimeRequestController extends Controller
         return $this->success($overtimeRequest, 'Overtime request created successfully.', 201);
     }
 
-    /**
-     * @OA\Patch(
-     *     path="/api/admin/overtime-requests/{overtimeRequest}/status",
-     *     summary="Update overtime request status",
-     *     tags={"Overtime"},
-     *     security={{"sanctum":{}}},
-     *
-     *     @OA\Parameter(name="overtimeRequest", in="path", required=true, @OA\Schema(type="integer")),
-     *
-     *     @OA\RequestBody(
-     *         required=true,
-     *
-     *         @OA\JsonContent(
-     *
-     *             @OA\Property(property="status", type="string", enum={"approved", "rejected"})
-     *         )
-     *     ),
-     *
-     *     @OA\Response(response=200, description="Overtime request status updated successfully")
-     * )
-     */
+
     public function updateStatus(UpdateOvertimeStatusRequest $request, OvertimeRequest $overtimeRequest): JsonResponse
     {
         $overtimeRequest->update([
