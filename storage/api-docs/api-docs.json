@@ -2233,6 +2233,18 @@
                                         "example": "+963944000000",
                                         "nullable": true,
                                         "maxLength": 20
+                                    },
+                                    "shift_start_time": {
+                                        "type": "string",
+                                        "format": "time",
+                                        "example": "09:00",
+                                        "nullable": true
+                                    },
+                                    "shift_end_time": {
+                                        "type": "string",
+                                        "format": "time",
+                                        "example": "17:00",
+                                        "nullable": true
                                     }
                                 },
                                 "type": "object"
@@ -3437,6 +3449,21 @@
                         "example": "Check extinguishers and emergency exits.",
                         "nullable": true
                     },
+                    "priority": {
+                        "type": "string",
+                        "example": "medium",
+                        "enum": [
+                            "low",
+                            "medium",
+                            "high",
+                            "urgent"
+                        ]
+                    },
+                    "reminder_interval_minutes": {
+                        "type": "integer",
+                        "example": 60,
+                        "nullable": true
+                    },
                     "task_date": {
                         "type": "string",
                         "format": "date",
@@ -3703,6 +3730,21 @@
                         "example": "Check extinguishers and emergency exits.",
                         "nullable": true
                     },
+                    "priority": {
+                        "type": "string",
+                        "example": "medium",
+                        "enum": [
+                            "low",
+                            "medium",
+                            "high",
+                            "urgent"
+                        ]
+                    },
+                    "reminder_interval_minutes": {
+                        "type": "integer",
+                        "example": 60,
+                        "nullable": true
+                    },
                     "task_date": {
                         "type": "string",
                         "format": "date",
@@ -3754,6 +3796,21 @@
                     "description": {
                         "type": "string",
                         "example": "Updated description.",
+                        "nullable": true
+                    },
+                    "priority": {
+                        "type": "string",
+                        "example": "medium",
+                        "enum": [
+                            "low",
+                            "medium",
+                            "high",
+                            "urgent"
+                        ]
+                    },
+                    "reminder_interval_minutes": {
+                        "type": "integer",
+                        "example": 60,
                         "nullable": true
                     },
                     "task_date": {
@@ -3897,6 +3954,18 @@
                     "is_active": {
                         "type": "boolean",
                         "example": true
+                    },
+                    "shift_start_time": {
+                        "type": "string",
+                        "format": "time",
+                        "example": "09:00",
+                        "nullable": true
+                    },
+                    "shift_end_time": {
+                        "type": "string",
+                        "format": "time",
+                        "example": "17:00",
+                        "nullable": true
                     }
                 },
                 "type": "object"
@@ -3991,6 +4060,18 @@
                     "is_active": {
                         "type": "boolean",
                         "example": true
+                    },
+                    "shift_start_time": {
+                        "type": "string",
+                        "format": "time",
+                        "example": "09:00:00",
+                        "nullable": true
+                    },
+                    "shift_end_time": {
+                        "type": "string",
+                        "format": "time",
+                        "example": "17:00:00",
+                        "nullable": true
                     },
                     "created_at": {
                         "type": "string",

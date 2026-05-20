@@ -11,6 +11,8 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'id', type: 'integer', example: 101),
         new OA\Property(property: 'title', type: 'string', example: 'Inspect warehouse safety equipment'),
         new OA\Property(property: 'description', type: 'string', nullable: true, example: 'Check extinguishers and emergency exits.'),
+        new OA\Property(property: 'priority', type: 'string', enum: ['low', 'medium', 'high', 'urgent'], example: 'medium'),
+        new OA\Property(property: 'reminder_interval_minutes', type: 'integer', nullable: true, example: 60),
         new OA\Property(property: 'task_date', type: 'string', format: 'date', example: '2026-05-12'),
         new OA\Property(property: 'start_at', type: 'string', format: 'date-time', example: '2026-05-12T09:00:00+00:00'),
         new OA\Property(property: 'end_at', type: 'string', format: 'date-time', nullable: true, example: '2026-05-12T11:00:00+00:00'),

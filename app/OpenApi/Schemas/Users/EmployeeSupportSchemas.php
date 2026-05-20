@@ -12,6 +12,8 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'password', type: 'string', minLength: 6, maxLength: 50, nullable: true, example: 'newsecret123'),
         new OA\Property(property: 'phone', type: 'string', maxLength: 20, nullable: true, example: '+963944000000'),
         new OA\Property(property: 'is_active', type: 'boolean', example: true),
+        new OA\Property(property: 'shift_start_time', type: 'string', format: 'time', nullable: true, example: '09:00'),
+        new OA\Property(property: 'shift_end_time', type: 'string', format: 'time', nullable: true, example: '17:00'),
     ],
     type: 'object',
 )]
