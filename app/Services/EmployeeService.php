@@ -35,7 +35,7 @@ class EmployeeService
     }
 
     /**
-     * @param  array{name: string, email: string, password: string, phone?: string|null}  $data
+     * @param  array{name: string, email: string, password: string, phone?: string|null, shift_start_time?: string|null, shift_end_time?: string|null}  $data
      */
     public function create(array $data): User
     {
@@ -47,12 +47,14 @@ class EmployeeService
                 'phone' => $data['phone'] ?? null,
                 'role' => UserRole::Employee,
                 'is_active' => true,
+                'shift_start_time' => $data['shift_start_time'] ?? null,
+                'shift_end_time' => $data['shift_end_time'] ?? null,
             ]);
         });
     }
 
     /**
-     * @param  array{name?: string, email?: string, password?: string|null, phone?: string|null, is_active?: bool}  $data
+     * @param  array{name?: string, email?: string, password?: string|null, phone?: string|null, is_active?: bool, shift_start_time?: string|null, shift_end_time?: string|null}  $data
      */
     public function update(User $employee, array $data): User
     {

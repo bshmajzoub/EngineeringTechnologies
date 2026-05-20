@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\AssignmentStatus;
+use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use App\Enums\UserRole;
 use App\Exceptions\AssignmentConflictException;
@@ -40,6 +41,7 @@ class TaskService
      * @param  array{
      *     q?: string|null,
      *     status?: string|null,
+     *     priority?: string|null,
      *     employee_id?: int|string|null,
      *     task_date?: string|null,
      *     date_from?: string|null,
@@ -62,6 +64,7 @@ class TaskService
                 });
             })
             ->when($filters['status'] ?? null, fn ($query, string $status) => $query->where('status', $status))
+            ->when($filters['priority'] ?? null, fn ($query, string $priority) => $query->where('priority', $priority))
             ->when($filters['employee_id'] ?? null, function ($query, int|string $employeeId): void {
                 $query->whereHas('assignments', fn ($query) => $query->where('user_id', (int) $employeeId));
             })
@@ -80,6 +83,8 @@ class TaskService
      *     task_date: string,
      *     start_at: string,
      *     end_at?: string|null,
+     *     priority?: string|null,
+     *     reminder_interval_minutes?: int|null,
      *     employee_ids: list<int|string>,
      *     assignment_notes?: array<int|string, string|null>
      * }  $data
@@ -102,6 +107,8 @@ class TaskService
                 'task_date' => $data['task_date'],
                 'start_at' => $data['start_at'],
                 'end_at' => $data['end_at'] ?? null,
+                'priority' => $data['priority'] ?? TaskPriority::MEDIUM->value,
+                'reminder_interval_minutes' => $data['reminder_interval_minutes'] ?? null,
                 'status' => TaskStatus::Pending,
                 'created_by' => $admin->id,
             ]);
@@ -131,6 +138,8 @@ class TaskService
      *     task_date?: string,
      *     start_at?: string,
      *     end_at?: string|null,
+     *     priority?: string|null,
+     *     reminder_interval_minutes?: int|null,
      *     assignment_notes?: array<int|string, string|null>
      * }  $data
      */

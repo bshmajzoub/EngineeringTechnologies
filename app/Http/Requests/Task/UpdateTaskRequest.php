@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests\Task;
 
+use App\Enums\TaskPriority;
 use Carbon\Carbon;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class UpdateTaskRequest extends FormRequest
@@ -27,6 +29,8 @@ class UpdateTaskRequest extends FormRequest
         return [
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'description' => ['sometimes', 'nullable', 'string'],
+            'priority' => ['sometimes', 'required', Rule::in(TaskPriority::values())],
+            'reminder_interval_minutes' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'task_date' => ['sometimes', 'required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'start_at' => ['sometimes', 'required', 'date', 'after_or_equal:now'],
             'end_at' => ['sometimes', 'nullable', 'date'],

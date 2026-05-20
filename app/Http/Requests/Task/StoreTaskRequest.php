@@ -2,10 +2,12 @@
 
 namespace App\Http\Requests\Task;
 
+use App\Enums\TaskPriority;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 class StoreTaskRequest extends FormRequest
@@ -28,6 +30,8 @@ class StoreTaskRequest extends FormRequest
         return [
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string'],
+            'priority' => ['sometimes', 'required', Rule::in(TaskPriority::values())],
+            'reminder_interval_minutes' => ['sometimes', 'nullable', 'integer', 'min:1'],
             'task_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
             'start_at' => ['required', 'date', 'after_or_equal:now'],
             'end_at' => ['nullable', 'date', 'after:start_at'],

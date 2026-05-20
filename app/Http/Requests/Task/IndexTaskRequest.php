@@ -3,6 +3,7 @@
 namespace App\Http\Requests\Task;
 
 use App\Enums\AssignmentStatus;
+use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,6 +29,7 @@ class IndexTaskRequest extends FormRequest
         return [
             'q' => ['sometimes', 'nullable', 'string', 'max:255'],
             'status' => ['sometimes', 'nullable', Rule::in(TaskStatus::values())],
+            'priority' => ['sometimes', 'nullable', Rule::in(TaskPriority::values())],
             'assignment_status' => ['sometimes', 'nullable', Rule::in(AssignmentStatus::values())],
             'employee_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
             'task_date' => ['sometimes', 'nullable', 'date_format:Y-m-d'],

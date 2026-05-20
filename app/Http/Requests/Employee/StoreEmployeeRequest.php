@@ -28,6 +28,8 @@ class StoreEmployeeRequest extends FormRequest
             'email' => ['required', 'email', 'max:255', Rule::unique('users', 'email')],
             'password' => ['required', 'string', 'min:6', 'max:50'],
             'phone' => ['nullable', 'string', 'max:20'],
+            'shift_start_time' => ['nullable', 'date_format:H:i'],
+            'shift_end_time' => ['nullable', 'date_format:H:i', 'after:shift_start_time'],
         ];
     }
 }

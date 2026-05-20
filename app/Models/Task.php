@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TaskPriority;
 use App\Enums\TaskStatus;
 use Database\Factories\TaskFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -27,10 +28,13 @@ class Task extends Model
         'start_at',
         'end_at',
         'status',
+        'priority',
         'created_by',
         'completed_at',
         'cancelled_at',
         'cancel_reason',
+        'reminder_interval_minutes',
+        'last_reminder_sent_at',
     ];
 
     /**
@@ -45,8 +49,11 @@ class Task extends Model
             'start_at' => 'datetime',
             'end_at' => 'datetime',
             'status' => TaskStatus::class,
+            'priority' => TaskPriority::class,
             'completed_at' => 'datetime',
             'cancelled_at' => 'datetime',
+            'last_reminder_sent_at' => 'datetime',
+            'reminder_interval_minutes' => 'integer',
         ];
     }
 

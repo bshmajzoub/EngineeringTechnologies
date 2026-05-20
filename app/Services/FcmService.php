@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Enums\UserRole;
 use App\Jobs\SendFcmNotification;
 use App\Models\DeviceToken;
+use App\Models\OvertimeRequest;
 use App\Models\TaskAssignment;
 use App\Models\User;
 use Illuminate\Support\Facades\Cache;
@@ -70,6 +72,21 @@ class FcmService
             'assignment_id' => (string) $assignment->id,
             'title' => 'Progress Update Required',
             'body' => "Please submit your hourly progress update for: {$task->title}",
+        ]);
+    }
+
+    public function sendTaskCustomReminder(TaskAssignment $assignment): void
+    {
+        $user = $assignment->user;
+        $task = $assignment->task;
+
+        $this->dispatchToUser($user, [
+            'type' => 'task_custom_reminder',
+            'task_id' => (string) $task->id,
+            'task_title' => $task->title,
+            'assignment_id' => (string) $assignment->id,
+            'title' => 'Task Reminder',
+            'body' => "Reminder: Please provide an update for your task: {$task->title}",
         ]);
     }
 
@@ -144,6 +161,34 @@ class FcmService
             'rejection_reason' => (string) ($assignment->rejection_reason ?? ''),
             'title' => 'Task Assignment Rejected',
             'body' => "{$assignment->user?->name} rejected: {$task->title}",
+        ]);
+    }
+
+    public function sendOvertimeRequestedNotification(OvertimeRequest $request): void
+    {
+        $admin = User::where('role', UserRole::Admin->value)->first();
+
+        if (! $admin) {
+            return;
+        }
+
+        $this->dispatchToUser($admin, [
+            'type' => 'overtime_requested',
+            'overtime_request_id' => (string) $request->id,
+            'employee_id' => (string) $request->user_id,
+            'title' => 'Overtime Request',
+            'body' => "Employee {$request->user->name} has requested {$request->requested_hours} hours of overtime on {$request->date->toDateString()}.",
+        ]);
+    }
+
+    public function sendOvertimeStatusUpdatedNotification(OvertimeRequest $request): void
+    {
+        $this->dispatchToUser($request->user, [
+            'type' => 'overtime_status_updated',
+            'overtime_request_id' => (string) $request->id,
+            'status' => $request->status->value,
+            'title' => 'Overtime Request Updated',
+            'body' => "Your overtime request for {$request->date->toDateString()} has been {$request->status->value}.",
         ]);
     }
 

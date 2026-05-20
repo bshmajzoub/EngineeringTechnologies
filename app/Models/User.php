@@ -29,6 +29,8 @@ class User extends Authenticatable
         'phone',
         'role',
         'is_active',
+        'shift_start_time',
+        'shift_end_time',
     ];
 
     /**

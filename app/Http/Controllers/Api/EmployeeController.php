@@ -35,6 +35,44 @@ class EmployeeController extends Controller
         ], 'Employees retrieved successfully.');
     }
 
+    /**
+     * @OA\Post(
+     *     path="/api/employees",
+     *     summary="Create a new employee",
+     *     tags={"Employees"},
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="first_name", type="string"),
+     *             @OA\Property(property="last_name", type="string"),
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="password", type="string", minLength=6),
+     *             @OA\Property(property="phone", type="string", nullable=true),
+     *             @OA\Property(property="shift_start_time", type="string", format="time", example="09:00", nullable=true),
+     *             @OA\Property(property="shift_end_time", type="string", format="time", example="17:00", nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=201,
+     *         description="Employee created successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Employee created successfully."),
+     *             @OA\Property(property="data", type="object",
+     *                 @OA\Property(property="employee", ref="#/components/schemas/UserResource"),
+     *                 @OA\Property(property="plain_password", type="string")
+     *             )
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
     public function store(StoreEmployeeRequest $request): JsonResponse
     {
         $plainPassword = $request->validated('password');
@@ -55,6 +93,93 @@ class EmployeeController extends Controller
         return $this->success(new UserResource($employee), 'Employee retrieved successfully.');
     }
 
+    /**
+     * @OA\Put(
+     *     path="/api/admin/employees/{employee}",
+     *     summary="Update an employee",
+     *     tags={"Employees"},
+     *
+     *     @OA\Parameter(
+     *         name="employee",
+     *         in="path",
+     *         required=true,
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="password", type="string", minLength=6, nullable=true),
+     *             @OA\Property(property="phone", type="string", nullable=true),
+     *             @OA\Property(property="is_active", type="boolean"),
+     *             @OA\Property(property="shift_start_time", type="string", format="time", example="09:00", nullable=true),
+     *             @OA\Property(property="shift_end_time", type="string", format="time", example="17:00", nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Employee updated successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Employee updated successfully."),
+     *             @OA\Property(property="data", ref="#/components/schemas/UserResource")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=404, description="Employee not found"),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     *
+     * @OA\Patch(
+     *     path="/api/admin/employees/{employee}",
+     *     summary="Update an employee (Patch)",
+     *     tags={"Employees"},
+     *
+     *     @OA\Parameter(
+     *         name="employee",
+     *         in="path",
+     *         required=true,
+     *
+     *         @OA\Schema(type="integer")
+     *     ),
+     *
+     *     @OA\RequestBody(
+     *         required=true,
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="email", type="string", format="email"),
+     *             @OA\Property(property="password", type="string", minLength=6, nullable=true),
+     *             @OA\Property(property="phone", type="string", nullable=true),
+     *             @OA\Property(property="is_active", type="boolean"),
+     *             @OA\Property(property="shift_start_time", type="string", format="time", example="09:00", nullable=true),
+     *             @OA\Property(property="shift_end_time", type="string", format="time", example="17:00", nullable=true)
+     *         )
+     *     ),
+     *
+     *     @OA\Response(
+     *         response=200,
+     *         description="Employee updated successfully",
+     *
+     *         @OA\JsonContent(
+     *
+     *             @OA\Property(property="message", type="string", example="Employee updated successfully."),
+     *             @OA\Property(property="data", ref="#/components/schemas/UserResource")
+     *         )
+     *     ),
+     *
+     *     @OA\Response(response=404, description="Employee not found"),
+     *     @OA\Response(response=422, description="Validation error")
+     * )
+     */
     public function update(UpdateEmployeeRequest $request, User $employee): JsonResponse
     {
         if (! $this->isEmployee($employee)) {

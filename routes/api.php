@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\EmployeeController;
 use App\Http\Controllers\Api\LocationController;
+use App\Http\Controllers\Api\OvertimeRequestController;
 use App\Http\Controllers\Api\TaskAssignmentController;
 use App\Http\Controllers\Api\TaskController;
 use App\Http\Controllers\Api\TaskReplyController;
@@ -50,12 +51,16 @@ Route::middleware(['auth:sanctum', 'active'])->group(function () {
         Route::patch('/tasks/{task}/activate', [TaskController::class, 'activate']);
     });
 
-    Route::middleware('role:employee')->prefix('assignments')->group(function () {
-        Route::get('/my-current', [TaskAssignmentController::class, 'myCurrent']);
-        Route::patch('/{assignment}/accept', [TaskAssignmentController::class, 'accept']);
-        Route::patch('/{assignment}/reject', [TaskAssignmentController::class, 'reject']);
-        Route::patch('/{assignment}/complete', [TaskAssignmentController::class, 'complete']);
-        Route::post('/{assignment}/replies', [TaskReplyController::class, 'store']);
+    Route::middleware('role:employee')->group(function () {
+        Route::prefix('assignments')->group(function () {
+            Route::get('/my-current', [TaskAssignmentController::class, 'myCurrent']);
+            Route::patch('/{assignment}/accept', [TaskAssignmentController::class, 'accept']);
+            Route::patch('/{assignment}/reject', [TaskAssignmentController::class, 'reject']);
+            Route::patch('/{assignment}/complete', [TaskAssignmentController::class, 'complete']);
+            Route::post('/{assignment}/replies', [TaskReplyController::class, 'store']);
+        });
+
+        Route::post('/overtime-requests', [OvertimeRequestController::class, 'store']);
     });
 });
 
@@ -72,6 +77,9 @@ Route::middleware(['auth:sanctum', 'active', 'role:admin'])
         Route::delete('/employees/{employee}', [EmployeeController::class, 'destroy']);
         Route::apiResource('employees', EmployeeController::class)->except(['destroy']);
         Route::patch('/employees/{employee}/toggle-active', [EmployeeController::class, 'toggleActive']);
+
+        Route::get('/overtime-requests', [OvertimeRequestController::class, 'index']);
+        Route::patch('/overtime-requests/{overtimeRequest}/status', [OvertimeRequestController::class, 'updateStatus']);
     });
 
 // Location routes

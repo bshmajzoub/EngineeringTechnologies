@@ -37,6 +37,8 @@ class UpdateEmployeeRequest extends FormRequest
             'password' => ['sometimes', 'nullable', 'string', 'min:6', 'max:50'],
             'phone' => ['sometimes', 'nullable', 'string', 'max:20'],
             'is_active' => ['sometimes', 'boolean'],
+            'shift_start_time' => ['sometimes', 'nullable', 'date_format:H:i'],
+            'shift_end_time' => ['sometimes', 'nullable', 'date_format:H:i'],
         ];
     }
 }
